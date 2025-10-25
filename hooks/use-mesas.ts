@@ -1,37 +1,43 @@
-import useSWR from "swr"
-import { mesasApi, comandasApi, type Mesa } from "@/lib/api"
+// hooks/use-mesas.ts
+"use client";
 
-export function useMesas() {
-  const { data, error, isLoading, mutate } = useSWR<Mesa[]>(
-    "/mesa",
-    async () => {
-      console.log("[v0] Fetching mesas...")
-      try {
-        const result = await mesasApi.listar()
-        console.log("[v0] Mesas response:", result)
-        return result.filter((mesa) => mesa.ativa)
-      } catch (err) {
-        console.error("[v0] Error fetching mesas:", err)
-        throw err
-      }
-    },
-    {
-      refreshInterval: 5000,
-      revalidateOnFocus: true,
-      onError: (err) => {
-        console.error("[v0] SWR error:", err)
-      },
-    },
-  )
+import useSWR from "swr";
+import { mesasApi, type MesaComStatus } from "@/lib/api";
 
-  return {
-    mesas: data,
-    isLoading,
-    isError: error,
-    mutate,
-  }
+type UseMesas = {
+  mesas: MesaComStatus[];
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+};
+
+const REFRESH_MS = 5000; // ajuste se quiser
+
+async function fetchMesas(): Promise<MesaComStatus[]> {
+  const mesas = await mesasApi.listarMesas();
+  const status = await Promise.all(
+    mesas.map(async (m) => {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/get-comanda-by-mesa?mesa_id=${m.id}&fechada=false`);
+      const data = await res.json();
+      const ocupada = Array.isArray(data) && data.length > 0;
+      return { ...m, ocupada, livre: !ocupada };
+    })
+  );
+  return status;
 }
 
-export async function verificarComandaAberta(mesa_id: number) {
-  return await comandasApi.verificarComandaAberta(mesa_id)
+
+export function useMesas(): UseMesas {
+  const { data, error, isLoading, mutate } = useSWR<MesaComStatus[]>(
+    "mesas-com-status",
+    fetchMesas,
+    { refreshInterval: REFRESH_MS, revalidateOnFocus: true }
+  );
+
+  return {
+    mesas: data ?? [],
+    loading: isLoading,
+    error: error ? (error as Error).message : null,
+    refresh: () => mutate(),
+  };
 }
