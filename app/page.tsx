@@ -10,11 +10,10 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export default function MesasPage() {
-  const { mesas, isLoading, isError, mutate } = useMesas()
+  const { mesas, loading, error, refresh } = useMesas()
   const [mesaSelecionada, setMesaSelecionada] = useState<Mesa | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-
-  console.log("[v0] MesasPage render - mesas:", mesas, "isLoading:", isLoading, "isError:", isError)
+  const [refreshing, setRefreshing] = useState(false)
 
   const handleMesaClick = (mesa: Mesa) => {
     setMesaSelecionada(mesa)
@@ -22,10 +21,17 @@ export default function MesasPage() {
   }
 
   const handleComandaUpdated = () => {
-    mutate()
+    refresh()
   }
 
-  if (isLoading) {
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    refresh()
+    // Simular delay visual mínimo
+    setTimeout(() => setRefreshing(false), 500)
+  }
+
+  if (loading && !mesas.length) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -33,16 +39,16 @@ export default function MesasPage() {
     )
   }
 
-  if (isError) {
+  if (error) {
     return (
       <div className="min-h-screen bg-background p-4">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Erro ao carregar mesas</AlertTitle>
           <AlertDescription>
-            Não foi possível conectar com a API. Verifique a URL da API nas variáveis de ambiente.
+            {error}
             <div className="mt-2">
-              <Button onClick={() => mutate()} variant="outline" size="sm">
+              <Button onClick={handleRefresh} variant="outline" size="sm">
                 Tentar novamente
               </Button>
             </div>
@@ -54,15 +60,24 @@ export default function MesasPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-10">
+      <header className="border-b bg-card sticky top-0 z-10 shadow-sm">
         <div className="container mx-auto px-3 py-3 sm:px-4 sm:py-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-foreground">Comandas</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Gerencie as mesas</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                {mesas.length} {mesas.length === 1 ? 'mesa' : 'mesas'} • 
+                {mesas.filter(m => m.ocupada).length} ocupada{mesas.filter(m => m.ocupada).length !== 1 ? 's' : ''}
+              </p>
             </div>
-            <Button onClick={() => mutate()} variant="outline" size="icon" className="h-9 w-9">
-              <RefreshCw className="w-4 h-4" />
+            <Button 
+              onClick={handleRefresh} 
+              variant="outline" 
+              size="icon" 
+              className="h-9 w-9"
+              disabled={refreshing}
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
